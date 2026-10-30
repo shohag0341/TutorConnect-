@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>টিউটর হিসেবে যোগ দিন</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container" style="max-width:760px">
+  <div class="page-head">
+    <h1 id="page-title">টিউটর হিসেবে যোগ দিন</h1>
+    <p class="muted">আপনার প্রোফাইল যত পূর্ণাঙ্গ, অভিভাবকের বিশ্বাস তত বেশি। সব তথ্য পরে বদলাতে পারবেন।</p>
+  </div>
+
+  <div id="msg" hidden></div>
+
+  <form id="tutor-form" novalidate hidden>
+
+    <section class="card form-section">
+      <h2><span class="num">১</span> ছবি ও মূল তথ্য</h2>
+      <div class="avatar-pick field">
+        <div class="avatar" id="avatar-box">ছবি</div>
+        <div>
+          <label class="btn btn-ghost btn-sm" for="avatar-file" style="cursor:pointer">ছবি বেছে নিন</label>
+          <input type="file" id="avatar-file" accept="image/*" hidden>
+          <div class="hint">পরিষ্কার মুখের ছবি দিন। স্বয়ংক্রিয়ভাবে ছোট করা হবে।</div>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="gender">লিঙ্গ</label>
+          <select class="input" id="gender">
+            <option value="">বেছে নিন</option>
+            <option value="male">পুরুষ</option>
+            <option value="female">নারী</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="experience">অভিজ্ঞতা</label>
+          <select class="input" id="experience"></select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <h2><span class="num">২</span> শিক্ষাগত যোগ্যতা</h2>
+      <div class="field">
+        <label for="institution">শিক্ষাপ্রতিষ্ঠান / বিশ্ববিদ্যালয়</label>
+        <input class="input" id="institution" placeholder="যেমন: রংপুর কারমাইকেল কলেজ">
+      </div>
+      <div class="field">
+        <label for="department">বিভাগ / বিষয়</label>
+        <input class="input" id="department" placeholder="যেমন: পরিসংখ্যান">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="level">সর্বশেষ যোগ্যতা</label>
+          <select class="input" id="level"></select>
+        </div>
+        <div class="field">
+          <label for="year">বর্তমান বর্ষ (ঐচ্ছিক)</label>
+          <input class="input" id="year" placeholder="যেমন: ৩য় বর্ষ">
+        </div>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <h2><span class="num">৩</span> কী পড়াতে পারবেন</h2>
+      <div class="field">
+        <label>বিষয় (একাধিক বেছে নিন)</label>
+        <div class="chip-row" id="subject-chips"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input class="input" id="custom-subject" placeholder="তালিকায় না থাকলে বিষয় লিখুন">
+          <button class="btn btn-ghost" type="button" id="add-subject">যোগ</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>শ্রেণি</label>
+        <div class="chip-row" id="class-chips"></div>
+      </div>
+      <div class="field">
+        <label>শিক্ষার মাধ্যম</label>
+        <div class="chip-row" id="medium-chips"></div>
+      </div>
+      <div class="field">
+        <label for="mode">পড়ানোর পদ্ধতি</label>
+        <select class="input" id="mode">
+          <option value="home">বাসায় গিয়ে</option>
+          <option value="online">অনলাইন</option>
+          <option value="both" selected>বাসায় ও অনলাইন</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <h2><span class="num">৪</span> এলাকা ও প্রত্যাশিত বেতন</h2>
+      <div class="row-2">
+        <div class="field">
+          <label for="district">জেলা</label>
+          <select class="input" id="district"><option value="">বেছে নিন</option></select>
+        </div>
+        <div class="field">
+          <label for="upazila">উপজেলা</label>
+          <select class="input" id="upazila"><option value="">— বেছে নিন —</option></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="area-text">পছন্দের এলাকা / মহল্লা</label>
+        <input class="input" id="area-text" placeholder="যেমন: ধাপ, মডার্ন মোড়, সেন্ট্রাল রোড">
+        <div class="hint">কমা দিয়ে একাধিক এলাকা লিখতে পারেন।</div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="sal-min">সর্বনিম্ন (টাকা / মাস)</label>
+          <input class="input" id="sal-min" type="number" inputmode="numeric" min="0" placeholder="২০০০">
+        </div>
+        <div class="field">
+          <label for="sal-max">সর্বোচ্চ (টাকা / মাস)</label>
+          <input class="input" id="sal-max" type="number" inputmode="numeric" min="0" placeholder="৫০০০">
+        </div>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <h2><span class="num">৫</span> সাপ্তাহিক সময়</h2>
+      <div class="field">
+        <label>কোন দিনগুলোতে পারবেন</label>
+        <div class="chip-row" id="day-chips"></div>
+      </div>
+      <div class="field">
+        <label>কোন সময়ে পারবেন</label>
+        <div class="chip-row" id="time-chips"></div>
+      </div>
+    </section>
+
+    <section class="card form-section">
+      <h2><span class="num">৬</span> নিজের সম্পর্কে</h2>
+      <div class="field">
+        <textarea class="input" id="bio" rows="4" maxlength="600" placeholder="আপনার পড়ানোর পদ্ধতি ও অভিজ্ঞতা সংক্ষেপে লিখুন"></textarea>
+        <div class="hint">ফোন নম্বর বা সামাজিক মাধ্যমের লিংক এখানে লিখবেন না।</div>
+      </div>
+    </section>
+
+    <div class="sticky-save">
+      <button class="btn btn-primary btn-block" id="save" type="submit">প্রোফাইল সংরক্ষণ করুন</button>
+    </div>
+  </form>
+
+  <section class="card form-section" id="verify-card" hidden style="margin-top:16px">
+    <h2><span class="num">✔</span> Verified হন</h2>
+    <p>বর্তমান অবস্থা: <span class="badge badge-gold" id="verify-status">যাচাই করা হয়নি</span></p>
+    <p class="muted" style="font-size:.92rem">আপনার পরিচয়পত্র (NID, স্টুডেন্ট আইডি বা মার্কশিট) আপলোড করুন। ছবিটি শুধু আমাদের যাচাইকারী টিম দেখবে, পাবলিক প্রোফাইলে কখনো দেখানো হবে না।</p>
+    <div class="row-2">
+      <div class="field">
+        <label for="doc-type">ডকুমেন্টের ধরন</label>
+        <select class="input" id="doc-type">
+          <option value="nid">জাতীয় পরিচয়পত্র (NID)</option>
+          <option value="student_id">স্টুডেন্ট আইডি কার্ড</option>
+          <option value="certificate">মার্কশিট / সার্টিফিকেট</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="doc-file">ছবি বা PDF</label>
+        <input class="input" type="file" id="doc-file" accept="image/*,application/pdf" style="padding-top:10px">
+      </div>
+    </div>
+    <button class="btn btn-gold" type="button" id="send-verify">যাচাইয়ের জন্য পাঠান</button>
+  </section>
+
+  <div style="height:32px"></div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const msg = $('msg');
+  const { user } = await App.mount('become');
+
+  if (!App.configured) { App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।'); return; }
+  if (!user) { location.href = 'login.html?next=become-tutor.html'; return; }
+  const sb = App.sb;
+
+  // ---------- স্টেট ----------
+  const S = { subjects: new Set(), classes: new Set(), mediums: new Set(), days: new Set(), times: new Set(), avatarBlob: null, avatarUrl: null, exists: false };
+
+  // ---------- স্ট্যাটিক অপশন ----------
+  $('experience').innerHTML = ['০ (নতুন)', '১ বছর', '২ বছর', '৩ বছর', '৪ বছর', '৫ বছর', '৬ বছর', '৭+ বছর']
+    .map((l, i) => '<option value="' + i + '">' + l + '</option>').join('');
+  $('level').innerHTML = App.LEVELS.map((l) => '<option>' + App.esc(l) + '</option>').join('');
+
+  const drawSubjects = () => App.renderChips($('subject-chips'), [...new Set([...App.SUBJECTS, ...S.subjects])], S.subjects);
+  drawSubjects();
+  App.renderChips($('class-chips'), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], S.classes, (n) => 'ক্লাস ' + App.bn(n));
+  App.renderChips($('medium-chips'), ['bangla', 'english', 'madrasa'], S.mediums, (m) => App.MEDIUM[m]);
+  App.renderChips($('day-chips'), App.DAYS, S.days);
+  App.renderChips($('time-chips'), App.TIMES, S.times);
+
+  $('add-subject').addEventListener('click', () => {
+    const v = $('custom-subject').value.trim();
+    if (!v || v.length > 40) return;
+    S.subjects.add(v);
+    $('custom-subject').value = '';
+    drawSubjects();
+  });
+
+  // ---------- জেলা / উপজেলা ----------
+  const { data: dists } = await sb.from('districts').select('id, name_bn').order('id');
+  (dists || []).forEach((d) => $('district').insertAdjacentHTML('beforeend', '<option value="' + d.id + '">' + App.esc(d.name_bn) + '</option>'));
+
+  async function loadUpazilas(districtId, selected) {
+    const sel = $('upazila');
+    sel.innerHTML = '<option value="">— বেছে নিন —</option>';
+    if (!districtId) return;
+    const { data } = await sb.from('upazilas').select('id, name_bn').eq('district_id', districtId).order('name_bn');
+    (data || []).forEach((u) => sel.insertAdjacentHTML('beforeend', '<option value="' + u.id + '">' + App.esc(u.name_bn) + '</option>'));
+    if (selected) sel.value = String(selected);
+  }
+  $('district').addEventListener('change', (e) => loadUpazilas(e.target.value));
+
+  // ---------- বিদ্যমান তথ্য লোড ----------
+  const [{ data: prof }, { data: tp }] = await Promise.all([
+    sb.from('profiles').select('full_name, avatar_url, gender, district_id').eq('id', user.id).maybeSingle(),
+    sb.from('tutor_profiles').select('*').eq('user_id', user.id).maybeSingle()
+  ]);
+
+  const setAvatar = (url, name) => {
+    const box = $('avatar-box');
+    box.innerHTML = url ? '<img alt="" src="' + App.esc(url) + '">' : App.esc((name || 'ট').trim().charAt(0));
+  };
+  setAvatar(prof && prof.avatar_url, prof && prof.full_name);
+  S.avatarUrl = prof && prof.avatar_url;
+  if (prof) { $('gender').value = prof.gender || ''; }
+
+  if (tp) {
+    S.exists = true;
+    $('page-title').textContent = 'আমার টিউটর প্রোফাইল';
+    $('institution').value = tp.institution || '';
+    $('department').value = tp.department || '';
+    $('level').value = tp.education_level || App.LEVELS[0];
+    $('year').value = tp.current_year || '';
+    $('experience').value = Math.min(7, tp.experience_years || 0);
+    $('mode').value = tp.teaching_mode || 'both';
+    $('area-text').value = tp.area_text || '';
+    $('sal-min').value = tp.expected_salary_min || '';
+    $('sal-max').value = tp.expected_salary_max || '';
+    $('bio').value = tp.bio || '';
+    (tp.subjects || []).forEach((s) => S.subjects.add(s));
+    (tp.classes || []).forEach((c) => S.classes.add(c));
+    (tp.mediums || []).forEach((m) => S.mediums.add(m));
+    ((tp.schedule && tp.schedule.days) || []).forEach((d) => S.days.add(d));
+    ((tp.schedule && tp.schedule.times) || []).forEach((t) => S.times.add(t));
+    drawSubjects();
+    App.renderChips($('class-chips'), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], S.classes, (n) => 'ক্লাস ' + App.bn(n));
+    App.renderChips($('medium-chips'), ['bangla', 'english', 'madrasa'], S.mediums, (m) => App.MEDIUM[m]);
+    App.renderChips($('day-chips'), App.DAYS, S.days);
+    App.renderChips($('time-chips'), App.TIMES, S.times);
+    $('district').value = tp.district_id || '';
+    await loadUpazilas(tp.district_id, tp.upazila_id);
+  } else if (prof && prof.district_id) {
+    $('district').value = prof.district_id;
+    await loadUpazilas(prof.district_id);
+  }
+
+  $('tutor-form').hidden = false;
+
+  // ---------- ভেরিফিকেশন কার্ড ----------
+  const VS = { none: 'যাচাই করা হয়নি', pending: 'যাচাই চলছে', verified: 'Verified ✔', rejected: 'প্রত্যাখ্যাত — আবার পাঠান' };
+  function showVerify(status) {
+    $('verify-card').hidden = false;
+    const b = $('verify-status');
+    b.textContent = VS[status] || VS.none;
+    b.className = 'badge ' + (status === 'verified' ? 'badge-verified' : 'badge-gold');
+  }
+  if (tp) showVerify(tp.verify_status);
+
+  // ---------- ছবি বাছাই ----------
+  $('avatar-file').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      S.avatarBlob = await App.compressImage(f, 480, 0.82);
+      $('avatar-box').innerHTML = '<img alt="" src="' + URL.createObjectURL(S.avatarBlob) + '">';
+    } catch (err) { App.showAlert(msg, 'error', 'ছবিটি পড়া যায়নি। অন্য ছবি দিন।'); }
+  });
+
+  // ---------- সংরক্ষণ ----------
+  $('tutor-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+
+    const gender = $('gender').value;
+    const district = $('district').value;
+    const institution = $('institution').value.trim();
+    const min = $('sal-min').value ? parseInt($('sal-min').value, 10) : null;
+    const max = $('sal-max').value ? parseInt($('sal-max').value, 10) : null;
+
+    const fail = (t) => { App.showAlert(msg, 'error', t); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    if (!gender) return fail('আপনার লিঙ্গ বেছে নিন।');
+    if (!institution) return fail('শিক্ষাপ্রতিষ্ঠানের নাম লিখুন।');
+    if (S.subjects.size === 0) return fail('কমপক্ষে একটি বিষয় বেছে নিন।');
+    if (S.classes.size === 0) return fail('কমপক্ষে একটি শ্রেণি বেছে নিন।');
+    if (S.mediums.size === 0) return fail('কমপক্ষে একটি শিক্ষার মাধ্যম বেছে নিন।');
+    if (!district) return fail('জেলা বেছে নিন।');
+    if (min != null && max != null && max < min) return fail('সর্বোচ্চ বেতন সর্বনিম্নের চেয়ে কম হতে পারে না।');
+
+    const btn = $('save');
+    btn.disabled = true; btn.textContent = 'সংরক্ষণ হচ্ছে...';
+
+    try {
+      // ১) ছবি আপলোড
+      let avatarUrl = S.avatarUrl;
+      if (S.avatarBlob) {
+        const path = user.id + '/avatar.jpg';
+        const up = await sb.storage.from('avatars').upload(path, S.avatarBlob, { upsert: true, contentType: 'image/jpeg' });
+        if (up.error) throw up.error;
+        avatarUrl = sb.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
+      }
+
+      // ২) সাধারণ প্রোফাইল
+      const p1 = await sb.from('profiles').update({ gender, district_id: parseInt(district, 10), avatar_url: avatarUrl }).eq('id', user.id);
+      if (p1.error) throw p1.error;
+
+      // ৩) টিউটর প্রোফাইল
+      const payload = {
+        institution,
+        department: $('department').value.trim() || null,
+        education_level: $('level').value,
+        current_year: $('year').value.trim() || null,
+        experience_years: parseInt($('experience').value, 10),
+        subjects: [...S.subjects],
+        classes: [...S.classes].sort((a, b) => a - b),
+        mediums: [...S.mediums],
+        teaching_mode: $('mode').value,
+        district_id: parseInt(district, 10),
+        upazila_id: $('upazila').value ? parseInt($('upazila').value, 10) : null,
+        area_text: $('area-text').value.trim() || null,
+        expected_salary_min: min,
+        expected_salary_max: max,
+        schedule: { days: [...S.days], times: [...S.times] },
+        bio: $('bio').value.trim() || null
+      };
+      const r = S.exists
+        ? await sb.from('tutor_profiles').update(payload).eq('user_id', user.id)
+        : await sb.from('tutor_profiles').insert({ ...payload, user_id: user.id });
+      if (r.error) throw r.error;
+
+      S.avatarUrl = avatarUrl; S.avatarBlob = null;
+      if (!S.exists) { S.exists = true; showVerify('none'); $('page-title').textContent = 'আমার টিউটর প্রোফাইল'; }
+      App.toast('প্রোফাইল সংরক্ষণ হয়েছে ✔');
+      App.showAlert(msg, 'ok', 'প্রোফাইল সংরক্ষিত। এখন নিচ থেকে পরিচয় যাচাইয়ের জন্য ডকুমেন্ট পাঠালে Verified ব্যাজ পাবেন।');
+    } catch (err) {
+      console.error(err);
+      fail(App.errMsg(err));
+    }
+    btn.disabled = false; btn.textContent = 'প্রোফাইল সংরক্ষণ করুন';
+  });
+
+  // ---------- ভেরিফিকেশন পাঠানো ----------
+  $('send-verify').addEventListener('click', async () => {
+    msg.hidden = true;
+    const f = $('doc-file').files[0];
+    if (!f) return App.showAlert(msg, 'error', 'আগে একটি ছবি বা PDF বেছে নিন।');
+    const btn = $('send-verify');
+    btn.disabled = true; btn.textContent = 'পাঠানো হচ্ছে...';
+    try {
+      let blob = f, ext = 'pdf', type = 'application/pdf';
+      if (f.type.startsWith('image/')) {
+        blob = await App.compressImage(f, 1600, 0.8); ext = 'jpg'; type = 'image/jpeg';
+      } else if (f.type !== 'application/pdf') {
+        throw new Error('শুধু ছবি বা PDF দিন');
+      }
+      if (blob.size > 2 * 1024 * 1024) throw new Error('ফাইল ২ এমবির বেশি। ছোট ফাইল দিন।');
+
+      const path = user.id + '/' + Date.now() + '.' + ext;
+      const up = await sb.storage.from('verification-docs').upload(path, blob, { contentType: type });
+      if (up.error) throw up.error;
+      const ins = await sb.from('verifications').insert({ user_id: user.id, doc_type: $('doc-type').value, doc_path: path });
+      if (ins.error) throw ins.error;
+
+      showVerify('pending');
+      $('doc-file').value = '';
+      App.showAlert(msg, 'ok', 'ডকুমেন্ট পাঠানো হয়েছে। আমাদের টিম শিগগির যাচাই করবে।');
+    } catch (err) {
+      App.showAlert(msg, 'error', err.message && err.message.indexOf('ফাইল') !== -1 || (err.message || '').indexOf('শুধু') !== -1 ? err.message : App.errMsg(err));
+    }
+    btn.disabled = false; btn.textContent = 'যাচাইয়ের জন্য পাঠান';
+  });
+})();
+</script>
+</body>
+    </html>
+    
