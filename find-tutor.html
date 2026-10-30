@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>টিউটর খুঁজুন</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container">
+  <div class="page-head">
+    <h1>টিউটর খুঁজুন</h1>
+    <p class="muted">জেলা, শ্রেণি ও বিষয় অনুযায়ী আপনার জন্য সঠিক টিউটর বেছে নিন।</p>
+  </div>
+
+  <div class="filter-bar">
+    <div class="grow"></div>
+    <button class="btn btn-ghost btn-sm" type="button" id="toggle-filters">⚙ ফিল্টার</button>
+  </div>
+
+  <form class="card filters" id="filters">
+    <div class="filters-grid">
+      <div class="field"><label for="f-district">জেলা</label><select class="input" id="f-district"><option value="">সব জেলা</option></select></div>
+      <div class="field"><label for="f-upazila">উপজেলা</label><select class="input" id="f-upazila"><option value="">সব উপজেলা</option></select></div>
+      <div class="field"><label for="f-class">শ্রেণি</label><select class="input" id="f-class"><option value="">সব শ্রেণি</option></select></div>
+      <div class="field"><label for="f-subject">বিষয়</label><select class="input" id="f-subject"><option value="">সব বিষয়</option></select></div>
+      <div class="field"><label for="f-medium">মাধ্যম</label>
+        <select class="input" id="f-medium"><option value="">সব মাধ্যম</option><option value="bangla">বাংলা মাধ্যম</option><option value="english">ইংরেজি মাধ্যম</option><option value="madrasa">মাদ্রাসা</option></select></div>
+      <div class="field"><label for="f-mode">পদ্ধতি</label>
+        <select class="input" id="f-mode"><option value="">যেকোনো</option><option value="home">বাসায় গিয়ে</option><option value="online">অনলাইন</option></select></div>
+      <div class="field"><label for="f-gender">টিউটরের লিঙ্গ</label>
+        <select class="input" id="f-gender"><option value="">যেকোনো</option><option value="male">পুরুষ</option><option value="female">নারী</option></select></div>
+      <div class="field"><label for="f-exp">ন্যূনতম অভিজ্ঞতা</label>
+        <select class="input" id="f-exp"><option value="">যেকোনো</option><option value="1">১+ বছর</option><option value="2">২+ বছর</option><option value="3">৩+ বছর</option><option value="5">৫+ বছর</option></select></div>
+      <div class="field"><label for="f-budget">আপনার বাজেট (টাকা / মাস)</label><input class="input" id="f-budget" type="number" inputmode="numeric" min="0" placeholder="যেমন: ৪০০০"></div>
+      <div class="field full" style="align-self:end"><label class="check"><input type="checkbox" id="f-verified"> <span>শুধু Verified টিউটর</span></label></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" type="submit">খুঁজুন</button>
+      <button class="btn btn-ghost" type="button" id="reset">রিসেট</button>
+    </div>
+  </form>
+
+  <div class="result-count" id="count"></div>
+  <div id="msg" hidden></div>
+  <div class="list" id="list"></div>
+  <div class="center" style="margin:24px 0 40px"><button class="btn btn-ghost" id="more" hidden type="button">আরও দেখুন</button></div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  App.mount('tutor');
+  if (!App.configured) { App.showAlert($('msg'), 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।'); return; }
+  const sb = App.sb;
+  const PER = 12;
+  let page = 0, total = 0;
+  const districtName = {};
+
+  // ---------- ফিল্টারের অপশন ----------
+  for (let i = 1; i <= 12; i++) $('f-class').insertAdjacentHTML('beforeend', '<option value="' + i + '">ক্লাস ' + App.bn(i) + '</option>');
+  App.SUBJECTS.forEach((s) => $('f-subject').insertAdjacentHTML('beforeend', '<option>' + App.esc(s) + '</option>'));
+
+  const { data: dists } = await sb.from('districts').select('id, name_bn').order('id');
+  (dists || []).forEach((d) => {
+    districtName[d.id] = d.name_bn;
+    $('f-district').insertAdjacentHTML('beforeend', '<option value="' + d.id + '">' + App.esc(d.name_bn) + '</option>');
+  });
+
+  async function loadUpazilas(did) {
+    const sel = $('f-upazila');
+    sel.innerHTML = '<option value="">সব উপজেলা</option>';
+    if (!did) return;
+    const { data } = await sb.from('upazilas').select('id, name_bn').eq('district_id', did).order('name_bn');
+    (data || []).forEach((u) => sel.insertAdjacentHTML('beforeend', '<option value="' + u.id + '">' + App.esc(u.name_bn) + '</option>'));
+  }
+  $('f-district').addEventListener('change', (e) => loadUpazilas(e.target.value));
+
+  // URL প্যারামিটার থেকে আগেই বসানো
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('district')) { $('f-district').value = qp.get('district'); await loadUpazilas(qp.get('district')); }
+  if (qp.get('class')) $('f-class').value = qp.get('class');
+  if (qp.get('subject')) {
+    const s = qp.get('subject');
+    if (![...$('f-subject').options].some((o) => o.value === s)) $('f-subject').insertAdjacentHTML('beforeend', '<option>' + App.esc(s) + '</option>');
+    $('f-subject').value = s;
+  }
+
+  $('toggle-filters').addEventListener('click', () => $('filters').classList.toggle('open'));
+
+  // ---------- কার্ড ----------
+  function classText(arr) {
+    if (!arr || !arr.length) return '—';
+    const a = [...arr].sort((x, y) => x - y);
+    const contiguous = a.every((v, i) => i === 0 || v === a[i - 1] + 1);
+    return contiguous && a.length > 1 ? 'ক্লাস ' + App.bn(a[0]) + '–' + App.bn(a[a.length - 1]) : 'ক্লাস ' + a.map(App.bn).join(', ');
+  }
+  function salaryText(t) {
+    const mn = t.expected_salary_min, mx = t.expected_salary_max;
+    if (mn && mx) return '৳' + App.bn(mn) + '–' + App.bn(mx);
+    if (mn || mx) return '৳' + App.bn(mn || mx);
+    return 'আলোচনা সাপেক্ষে';
+  }
+  function card(t) {
+    const subs = (t.subjects || []).slice(0, 3).map((s) => '<span class="chip">' + App.esc(s) + '</span>').join('');
+    const more = (t.subjects || []).length > 3 ? '<span class="chip">+' + App.bn(t.subjects.length - 3) + '</span>' : '';
+    const loc = [t.area_text, districtName[t.district_id]].filter(Boolean).join(', ');
+    return '<a class="card card-lift tutor-card" href="tutor.html?id=' + encodeURIComponent(t.user_id) + '">' +
+      '<div class="top"><div class="avatar avatar-sm">' +
+      (t.avatar_url ? '<img alt="" loading="lazy" src="' + App.esc(t.avatar_url) + '">' : App.esc((t.full_name || 'ট').charAt(0))) +
+      '</div><div><h3>' + App.esc(t.full_name) + (t.is_verified ? ' <span class="badge badge-verified">✔ Verified</span>' : '') + '</h3>' +
+      '<div class="sub">' + App.esc([t.institution, t.department].filter(Boolean).join(' · ')) + '</div></div></div>' +
+      '<div class="tag-row">' + subs + more + '</div>' +
+      '<div class="meta-row"><span>📚 <b>' + classText(t.classes) + '</b></span><span>📍 ' + App.esc(loc || '—') + '</span>' +
+      '<span>🏠 ' + App.MODE[t.teaching_mode] + '</span><span>💰 <b>' + salaryText(t) + '</b></span>' +
+      (t.experience_years ? '<span>⏱ ' + App.bn(t.experience_years) + ' বছরের অভিজ্ঞতা</span>' : '') + '</div></a>';
+  }
+
+  // ---------- খোঁজা ----------
+  async function load(reset) {
+    if (reset) { page = 0; $('list').innerHTML = ''; }
+    $('msg').hidden = true;
+    $('more').hidden = true;
+    if (reset) $('list').innerHTML = '<div class="skeleton" style="height:150px"></div><div class="skeleton" style="height:150px"></div>';
+
+    let q = sb.from('public_tutors').select('*', { count: 'exact' });
+    const v = (id) => $(id).value;
+    if (v('f-district')) q = q.eq('district_id', +v('f-district'));
+    if (v('f-upazila')) q = q.eq('upazila_id', +v('f-upazila'));
+    if (v('f-class')) q = q.contains('classes', [+v('f-class')]);
+    if (v('f-subject')) q = q.contains('subjects', [v('f-subject')]);
+    if (v('f-medium')) q = q.contains('mediums', [v('f-medium')]);
+    if (v('f-mode')) q = q.in('teaching_mode', [v('f-mode'), 'both']);
+    if (v('f-gender')) q = q.eq('gender', v('f-gender'));
+    if (v('f-exp')) q = q.gte('experience_years', +v('f-exp'));
+    if (v('f-budget')) q = q.or('expected_salary_min.is.null,expected_salary_min.lte.' + parseInt(v('f-budget'), 10));
+    if ($('f-verified').checked) q = q.eq('is_verified', true);
+
+    const { data, count, error } = await q
+      .order('is_verified', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(page * PER, page * PER + PER - 1);
+
+    if (reset) $('list').innerHTML = '';
+    if (error) { console.error(error); return App.showAlert($('msg'), 'error', App.errMsg(error)); }
+
+    total = count || 0;
+    $('count').textContent = total ? App.bn(total) + ' জন টিউটর পাওয়া গেছে' : '';
+    if (!data.length && page === 0) {
+      $('list').innerHTML = '<div class="empty" style="grid-column:1/-1"><div style="font-size:2rem">🔍</div><p>এই শর্তে কোনো টিউটর পাওয়া যায়নি। ফিল্টার একটু শিথিল করে দেখুন।</p></div>';
+      return;
+    }
+    $('list').insertAdjacentHTML('beforeend', data.map(card).join(''));
+    $('more').hidden = (page + 1) * PER >= total;
+  }
+
+  $('filters').addEventListener('submit', (e) => { e.preventDefault(); $('filters').classList.remove('open'); load(true); });
+  $('reset').addEventListener('click', () => { $('filters').reset(); loadUpazilas(''); load(true); });
+  $('more').addEventListener('click', () => { page++; load(false); });
+
+  load(true);
+})();
+</script>
+</body>
+    </html>
+    
