@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>নতুন পাসওয়ার্ড</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container auth-wrap">
+  <div class="card auth-card">
+    <h1>নতুন পাসওয়ার্ড দিন</h1>
+    <p class="muted">ইমেইলের লিংক থেকে এসে থাকলে নিচে নতুন পাসওয়ার্ড বসান।</p>
+
+    <div id="msg" hidden></div>
+
+    <form id="reset-form" novalidate>
+      <div class="field">
+        <label for="password">নতুন পাসওয়ার্ড</label>
+        <div class="pw-wrap">
+          <input class="input" id="password" type="password" autocomplete="new-password" placeholder="কমপক্ষে ৮ অক্ষর" required>
+          <button type="button" class="pw-toggle" id="pw-toggle">দেখুন</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">পাসওয়ার্ড বদলান</button>
+    </form>
+  </div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  App.mount('account');
+  const $ = (id) => document.getElementById(id);
+  const msg = $('msg');
+
+  $('pw-toggle').addEventListener('click', () => {
+    const p = $('password');
+    const show = p.type === 'password';
+    p.type = show ? 'text' : 'password';
+    $('pw-toggle').textContent = show ? 'লুকান' : 'দেখুন';
+  });
+
+  $('reset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+    if (!App.configured) return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।');
+
+    const user = await App.getUser();
+    if (!user) return App.showAlert(msg, 'error', 'লিংকটির মেয়াদ শেষ বা ভুল। লগইন পেজ থেকে আবার রিসেট লিংক নিন।');
+
+    const password = $('password').value;
+    if (password.length < 8) return App.showAlert(msg, 'error', 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।');
+
+    const btn = $('submit');
+    btn.disabled = true;
+    const { error } = await App.sb.auth.updateUser({ password });
+    btn.disabled = false;
+    if (error) return App.showAlert(msg, 'error', App.errMsg(error));
+
+    $('reset-form').hidden = true;
+    App.showAlert(msg, 'ok', 'পাসওয়ার্ড বদলানো হয়েছে। এখন লগইন করুন।');
+    setTimeout(() => (location.href = 'login.html'), 1800);
+  });
+</script>
+</body>
+</html>
