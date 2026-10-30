@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>টিউটর প্রোফাইল</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container" style="padding-top:24px;padding-bottom:32px">
+  <a href="find-tutor.html" class="muted" style="display:inline-block;margin-bottom:14px">← সব টিউটর</a>
+  <div id="msg" hidden></div>
+  <div id="view"><div class="skeleton" style="height:180px"></div></div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const { user } = await App.mount('tutor');
+  const view = $('view'), msg = $('msg');
+  if (!App.configured) { view.innerHTML = ''; return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।'); }
+  const sb = App.sb;
+
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { view.innerHTML = '<div class="empty">টিউটর পাওয়া যায়নি।</div>'; return; }
+
+  const { data: t } = await sb.from('public_tutors').select('*').eq('user_id', id).maybeSingle();
+  if (!t) { view.innerHTML = '<div class="empty">এই প্রোফাইলটি পাওয়া যায়নি বা আর পাবলিক নেই।</div>'; return; }
+  document.title = t.full_name + ' — টিউটর প্রোফাইল';
+
+  const [{ data: dist }, { data: upz }] = await Promise.all([
+    sb.from('districts').select('name_bn').eq('id', t.district_id).maybeSingle(),
+    t.upazila_id ? sb.from('upazilas').select('name_bn').eq('id', t.upazila_id).maybeSingle() : Promise.resolve({ data: null })
+  ]);
+
+  const classes = [...(t.classes || [])].sort((a, b) => a - b);
+  const sal = t.expected_salary_min && t.expected_salary_max ? '৳' + App.bn(t.expected_salary_min) + ' – ৳' + App.bn(t.expected_salary_max) + ' / মাস'
+    : (t.expected_salary_min || t.expected_salary_max) ? '৳' + App.bn(t.expected_salary_min || t.expected_salary_max) + ' / মাস' : 'আলোচনা সাপেক্ষে';
+  const place = [t.area_text, upz && upz.name_bn, dist && dist.name_bn].filter(Boolean).join(', ') || '—';
+  const sch = t.schedule || {};
+  const isMe = user && user.id === t.user_id;
+
+  view.innerHTML =
+    '<div class="detail-grid">' +
+      '<div class="stack">' +
+        '<div class="card"><div class="avatar-pick">' +
+          '<div class="avatar avatar-lg">' + (t.avatar_url ? '<img alt="" src="' + App.esc(t.avatar_url) + '">' : App.esc((t.full_name || 'ট').charAt(0))) + '</div>' +
+          '<div><h1 style="font-size:1.5rem;margin-bottom:6px">' + App.esc(t.full_name) + '</h1>' +
+          (t.is_verified ? '<span class="badge badge-verified">✔ Verified</span>' : '<span class="badge badge-gold">যাচাই অপেক্ষমাণ</span>') +
+          '<div class="muted" style="margin-top:6px">' + App.esc([t.institution, t.department].filter(Boolean).join(' · ')) + '</div></div></div></div>' +
+        (t.bio ? '<div class="card"><h3>পরিচিতি</h3><p style="margin:0;white-space:pre-line">' + App.esc(t.bio) + '</p></div>' : '') +
+        '<div class="card"><h3>পাঠদানের তথ্য</h3><dl class="kv">' +
+          '<dt>বিষয়</dt><dd>' + (t.subjects || []).map((s) => '<span class="chip" style="margin:0 6px 6px 0">' + App.esc(s) + '</span>').join('') + '</dd>' +
+          '<dt>শ্রেণি</dt><dd>' + classes.map((c) => 'ক্লাস ' + App.bn(c)).join(', ') + '</dd>' +
+          '<dt>মাধ্যম</dt><dd>' + (t.mediums || []).map((m) => App.MEDIUM[m]).join(', ') + '</dd>' +
+          '<dt>পদ্ধতি</dt><dd>' + App.MODE[t.teaching_mode] + '</dd>' +
+          '<dt>এলাকা</dt><dd>' + App.esc(place) + '</dd>' +
+          '<dt>সময়</dt><dd>' + App.esc([(sch.days || []).join(', '), (sch.times || []).join(', ')].filter(Boolean).join(' · ') || '—') + '</dd>' +
+        '</dl></div>' +
+        '<div class="card"><h3>যোগ্যতা</h3><dl class="kv">' +
+          '<dt>সর্বশেষ</dt><dd>' + App.esc(t.education_level || '—') + (t.current_year ? ' (' + App.esc(t.current_year) + ')' : '') + '</dd>' +
+          '<dt>অভিজ্ঞতা</dt><dd>' + (t.experience_years ? App.bn(t.experience_years) + ' বছর' : 'নতুন') + '</dd>' +
+        '</dl></div>' +
+      '</div>' +
+      '<div class="card" style="position:sticky;top:80px"><div class="muted" style="font-size:.88rem">প্রত্যাশিত বেতন</div>' +
+        '<div style="font-size:1.4rem;font-weight:700;margin-bottom:14px">' + sal + '</div>' +
+        (isMe ? '<a class="btn btn-primary btn-block" href="become-tutor.html">আমার প্রোফাইল সম্পাদনা</a>' :
+        '<div class="stack"><button class="btn btn-primary btn-block" id="contact" type="button">যোগাযোগের অনুরোধ</button>' +
+        '<div class="action-row"><button class="btn btn-ghost btn-sm" id="fav" type="button">♡ সংরক্ষণ</button>' +
+        '<button class="btn btn-ghost btn-sm" id="report" type="button">⚑ রিপোর্ট</button></div>' +
+        '<p class="hint" style="margin:0">নিরাপত্তার জন্য ফোন নম্বর গোপন থাকে। আমাদের মডারেটর দুই পক্ষের সঙ্গে কথা বলে সংযোগ করিয়ে দেবেন।</p></div>') +
+      '</div>' +
+    '</div>';
+
+  if (isMe) return;
+
+  const needLogin = () => { location.href = 'login.html?next=' + encodeURIComponent('tutor.html?id=' + id); };
+
+  // ---------- যোগাযোগের অনুরোধ (সাপোর্ট থ্রেড) ----------
+  $('contact').addEventListener('click', async () => {
+    if (!user) return needLogin();
+    const b = $('contact');
+    b.disabled = true; b.textContent = 'পাঠানো হচ্ছে...';
+    const th = await sb.from('support_threads').insert({ user_id: user.id, subject: 'টিউটর যোগাযোগ অনুরোধ: ' + t.full_name }).select('id').single();
+    if (th.error) { b.disabled = false; b.textContent = 'যোগাযোগের অনুরোধ'; return App.showAlert(msg, 'error', App.errMsg(th.error)); }
+    const m = await sb.from('support_messages').insert({
+      thread_id: th.data.id,
+      body: 'আমি এই টিউটরের সঙ্গে যোগাযোগ করতে চাই। টিউটর আইডি: ' + t.user_id + ' | লিংক: ' + location.href
+    });
+    if (m.error) { b.disabled = false; b.textContent = 'যোগাযোগের অনুরোধ'; return App.showAlert(msg, 'error', App.errMsg(m.error)); }
+    b.textContent = '✔ অনুরোধ পাঠানো হয়েছে';
+    App.showAlert(msg, 'ok', 'আপনার অনুরোধ আমাদের মডারেটরের কাছে পৌঁছেছে। তিনি শিগগির আপনার সঙ্গে যোগাযোগ করবেন।');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // ---------- পছন্দের তালিকা ----------
+  let faved = false;
+  if (user) {
+    const { data: f } = await sb.from('fav_tutors').select('tutor_id').eq('user_id', user.id).eq('tutor_id', id).maybeSingle();
+    faved = !!f;
+  }
+  const drawFav = () => { $('fav').textContent = faved ? '♥ সংরক্ষিত' : '♡ সংরক্ষণ'; };
+  drawFav();
+  $('fav').addEventListener('click', async () => {
+    if (!user) return needLogin();
+    const r = faved
+      ? await sb.from('fav_tutors').delete().eq('user_id', user.id).eq('tutor_id', id)
+      : await sb.from('fav_tutors').insert({ user_id: user.id, tutor_id: id });
+    if (r.error) return App.toast(App.errMsg(r.error));
+    faved = !faved; drawFav();
+    App.toast(faved ? 'পছন্দের তালিকায় যোগ হয়েছে' : 'তালিকা থেকে সরানো হয়েছে');
+  });
+
+  // ---------- রিপোর্ট ----------
+  $('report').addEventListener('click', async () => {
+    if (!user) return needLogin();
+    const reason = (prompt('রিপোর্টের কারণ লিখুন (যেমন: ভুয়া তথ্য, অসদাচরণ):') || '').trim();
+    if (!reason) return;
+    const r = await sb.from('reports').insert({ reporter_id: user.id, target_type: 'tutor', target_id: t.user_id, reason: reason.slice(0, 300) });
+    if (r.error) return App.toast(App.errMsg(r.error));
+    App.toast('রিপোর্ট জমা হয়েছে। ধন্যবাদ।');
+  });
+})();
+</script>
+</body>
+</html>
