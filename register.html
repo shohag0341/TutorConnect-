@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>রেজিস্টার</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container auth-wrap">
+  <div class="card auth-card">
+    <h1>অ্যাকাউন্ট খুলুন</h1>
+    <p class="muted">একটি অ্যাকাউন্টেই আপনি টিউটর ও অভিভাবক — দুই ভূমিকায় কাজ করতে পারবেন।</p>
+
+    <div id="msg" hidden></div>
+
+    <form id="reg-form" novalidate>
+      <div class="field">
+        <label for="name">পূর্ণ নাম</label>
+        <input class="input" id="name" autocomplete="name" placeholder="আপনার নাম" required>
+      </div>
+      <div class="field">
+        <label for="phone">মোবাইল নম্বর</label>
+        <input class="input" id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01XXXXXXXXX" required>
+        <div class="hint">নম্বরটি গোপন থাকবে, পাবলিক প্রোফাইলে দেখানো হবে না।</div>
+      </div>
+      <div class="field">
+        <label for="email">ইমেইল</label>
+        <input class="input" id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="password">পাসওয়ার্ড</label>
+        <div class="pw-wrap">
+          <input class="input" id="password" type="password" autocomplete="new-password" placeholder="কমপক্ষে ৮ অক্ষর" required>
+          <button type="button" class="pw-toggle" id="pw-toggle">দেখুন</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="terms"> <span>আমি শর্তাবলী ও গোপনীয়তা নীতির সঙ্গে একমত।</span></label>
+      </div>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">রেজিস্টার করুন</button>
+    </form>
+
+    <p class="auth-foot">আগে থেকেই অ্যাকাউন্ট আছে? <a href="login.html"><strong>লগইন করুন</strong></a></p>
+  </div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  App.mount('account');
+
+  const $ = (id) => document.getElementById(id);
+  const msg = $('msg');
+
+  $('pw-toggle').addEventListener('click', () => {
+    const p = $('password');
+    const show = p.type === 'password';
+    p.type = show ? 'text' : 'password';
+    $('pw-toggle').textContent = show ? 'লুকান' : 'দেখুন';
+  });
+
+  $('reg-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+
+    if (!App.configured) return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase URL ও anon key বসান।');
+
+    const name = $('name').value.trim();
+    const phone = App.normalizePhone($('phone').value);
+    const email = $('email').value.trim();
+    const password = $('password').value;
+
+    if (name.length < 2) return App.showAlert(msg, 'error', 'আপনার নাম লিখুন।');
+    if (!phone) return App.showAlert(msg, 'error', 'সঠিক মোবাইল নম্বর দিন (যেমন 01712345678)।');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return App.showAlert(msg, 'error', 'সঠিক ইমেইল দিন।');
+    if (password.length < 8) return App.showAlert(msg, 'error', 'পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে।');
+    if (!$('terms').checked) return App.showAlert(msg, 'error', 'চালিয়ে যেতে শর্তাবলীতে সম্মতি দিন।');
+
+    const btn = $('submit');
+    btn.disabled = true; btn.textContent = 'অপেক্ষা করুন...';
+
+    const { data, error } = await App.sb.auth.signUp({
+      email, password,
+      options: { data: { full_name: name, phone }, emailRedirectTo: location.origin + '/login.html' }
+    });
+
+    btn.disabled = false; btn.textContent = 'রেজিস্টার করুন';
+    if (error) return App.showAlert(msg, 'error', App.errMsg(error));
+
+    if (data.session) {
+      location.href = 'index.html';       // ইমেইল কনফার্মেশন বন্ধ থাকলে সরাসরি লগইন
+    } else {
+      $('reg-form').hidden = true;
+      App.showAlert(msg, 'ok', 'প্রায় শেষ! ' + email + ' ঠিকানায় একটি যাচাই-লিংক পাঠানো হয়েছে। লিংকে ক্লিক করার পর লগইন করুন।');
+    }
+  });
+</script>
+</body>
+</html>
