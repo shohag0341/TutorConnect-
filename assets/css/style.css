@@ -196,4 +196,24 @@ select.input {
   .footer-in { flex-direction: row; justify-content: space-between; align-items: center; }
   .toast { bottom: 32px; }
     }
-        
+
+
+/* ===== v1.2 - Dashboard, ট্যাব, চ্যাট ===== */
+.tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 18px; padding-bottom: 4px; }
+.tab { padding: 8px 16px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); white-space: nowrap; font-size: .92rem; font-weight: 500; }
+.tab.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+.dot { display: inline-block; min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: #fff; font-size: .7rem; line-height: 18px; text-align: center; margin-left: 6px; padding: 0 5px; }
+.list-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; color: inherit; }
+.list-item.unread { border-left: 4px solid var(--accent); }
+.stat-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-bottom: 16px; }
+.stat { display: block; color: inherit; padding: 16px; }
+.stat b { display: block; font-size: 1.7rem; color: var(--primary); }
+.chat { display: flex; flex-direction: column; gap: 10px; max-height: 56vh; overflow-y: auto; padding: 4px; }
+.bubble { max-width: 86%; padding: 10px 14px; border-radius: 16px; white-space: pre-wrap; word-break: break-word; font-size: .95rem; }
+.bubble small { display: block; opacity: .65; font-size: .72rem; margin-top: 4px; }
+.bubble.me { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+.bubble.me a { color: #fff; text-decoration: underline; }
+.bubble.them { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.composer { display: flex; gap: 8px; margin-top: 12px; align-items: flex-end; }
+.composer textarea { flex: 1; min-height: 48px; max-height: 120px; }
+@media (min-width: 860px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
