@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>লগইন</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container auth-wrap">
+  <div class="card auth-card">
+    <h1>আবার স্বাগতম</h1>
+    <p class="muted">আপনার অ্যাকাউন্টে লগইন করুন।</p>
+
+    <div id="msg" hidden></div>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">ইমেইল</label>
+        <input class="input" id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="password">পাসওয়ার্ড</label>
+        <div class="pw-wrap">
+          <input class="input" id="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" id="pw-toggle">দেখুন</button>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="submit" type="submit">লগইন</button>
+    </form>
+
+    <p class="auth-foot" style="margin-top:14px"><a href="#" id="forgot">পাসওয়ার্ড ভুলে গেছেন?</a></p>
+    <p class="auth-foot" style="margin-top:6px">নতুন? <a href="register.html"><strong>অ্যাকাউন্ট খুলুন</strong></a></p>
+  </div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  App.mount('account');
+
+  const $ = (id) => document.getElementById(id);
+  const msg = $('msg');
+
+  // ইতিমধ্যে লগইন থাকলে হোমে পাঠান
+  App.getUser().then((u) => { if (u) location.replace('index.html'); });
+
+  $('pw-toggle').addEventListener('click', () => {
+    const p = $('password');
+    const show = p.type === 'password';
+    p.type = show ? 'text' : 'password';
+    $('pw-toggle').textContent = show ? 'লুকান' : 'দেখুন';
+  });
+
+  // লগইনের পর কোথায় যাবে (শুধু নিজের সাইটের পেজ, বাইরের লিংক নয়)
+  function nextPage() {
+    const n = new URLSearchParams(location.search).get('next');
+    return n && /^[a-z0-9\-_\/]+\.html$/i.test(n) ? n : 'index.html';
+  }
+
+  $('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+    if (!App.configured) return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase URL ও anon key বসান।');
+
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    if (!email || !password) return App.showAlert(msg, 'error', 'ইমেইল ও পাসওয়ার্ড দিন।');
+
+    const btn = $('submit');
+    btn.disabled = true; btn.textContent = 'অপেক্ষা করুন...';
+    const { error } = await App.sb.auth.signInWithPassword({ email, password });
+    btn.disabled = false; btn.textContent = 'লগইন';
+
+    if (error) return App.showAlert(msg, 'error', App.errMsg(error));
+    location.href = nextPage();
+  });
+
+  $('forgot').addEventListener('click', async (e) => {
+    e.preventDefault();
+    msg.hidden = true;
+    if (!App.configured) return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।');
+    const email = $('email').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return App.showAlert(msg, 'info', 'উপরের ঘরে আপনার ইমেইল লিখে আবার "পাসওয়ার্ড ভুলে গেছেন?" চাপুন।');
+    const { error } = await App.sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/reset.html' });
+    if (error) return App.showAlert(msg, 'error', App.errMsg(error));
+    App.showAlert(msg, 'ok', 'পাসওয়ার্ড রিসেটের লিংক পাঠানো হয়েছে। ইনবক্স বা স্প্যাম ফোল্ডার দেখুন।');
+  });
+</script>
+</body>
+</html>
