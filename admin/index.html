@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>অ্যাডমিন প্যানেল</title>
+<meta name="theme-color" content="#0E1A33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .doc-img { width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+  .perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  details.card summary { cursor: pointer; font-weight: 600; }
+  pre.json { white-space: pre-wrap; word-break: break-all; font-size: .75rem; background: #F4F1E8; padding: 10px; border-radius: 10px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="container" style="max-width:900px;padding-bottom:40px">
+  <div class="page-head"><h1>অ্যাডমিন প্যানেল</h1><p class="muted" id="who"></p></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div id="msg" hidden></div>
+  <div id="panel"></div>
+</main>
+
+<nav id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const { user, staff } = await App.mount('account');
+  const msg = $('msg'), panel = $('panel'), sb = App.sb;
+
+  if (!App.configured) return App.showAlert(msg, 'error', 'আগে assets/js/config.js ফাইলে Supabase তথ্য বসান।');
+  if (!user) { location.href = 'login.html?next=admin/index.html'; return; }
+  if (!staff) { panel.innerHTML = '<div class="empty">এই পেজ শুধু স্টাফদের জন্য।</div>'; return; }
+
+  const isSuper = staff.role === 'super_admin';
+  const can = (p) => isSuper || (staff.permissions || []).includes(p);
+  $('who').textContent = isSuper ? 'আপনি Super Admin' : 'আপনি মডারেটর';
+
+  const PERMS = [['verify_tutor', 'টিউটর যাচাই'], ['approve_post', 'পোস্ট অনুমোদন'], ['handle_reports', 'রিপোর্ট নিষ্পত্তি'],
+    ['view_contact', 'ফোন নম্বর দেখা'], ['block_user', 'ইউজার ব্লক'], ['manage_locations', 'লোকেশন সম্পাদনা'], ['view_audit', 'অডিট লগ দেখা']];
+  const TS = { open: 'নতুন', pending: 'উত্তর দেওয়া হয়েছে', resolved: 'সমাধান' };
+  const F = { inbox: 'open', verify: 'pending', posts: 'pending', reports: 'open' };
+  let poll = null;
+
+  const TABS = [['inbox', 'ইনবক্স', true], ['verify', 'ভেরিফিকেশন', can('verify_tutor')], ['posts', 'পোস্ট', can('approve_post')],
+    ['reports', 'রিপোর্ট', can('handle_reports')], ['users', 'ইউজার', true], ['staff', 'স্টাফ', isSuper], ['audit', 'অডিট', can('view_audit')]]
+    .filter((t) => t[2]);
+  $('tabs').innerHTML = TABS.map((t) => '<a class="tab" href="#" data-go="' + t[0] + '" data-tab="' + t[0] + '">' + t[1] + '<span id="bd-' + t[0] + '"></span></a>').join('');
+
+  // ---------- সাহায্যকারী ----------
+  const fmt = (ts) => new Date(ts).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+  const loading = () => { panel.innerHTML = '<div class="skeleton" style="height:90px"></div>'; };
+  const fail = (e) => { console.error(e); panel.innerHTML = ''; App.showAlert(msg, 'error', App.errMsg(e)); };
+  const chipbar = (tab, opts) => '<div class="chip-row" style="margin-bottom:14px">' + opts.map((o) =>
+    '<button type="button" class="chip-btn' + (F[tab] === o[0] ? ' on' : '') + '" data-fset="' + tab + '" data-val="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+  const back = (to, label) => '<a href="#" data-go="' + to + '" class="muted" style="display:inline-block;margin-bottom:10px">← ' + label + '</a>';
+
+  const nameMap = {};
+  async function names(ids) {
+    const need = [...new Set(ids.filter(Boolean))].filter((i) => !(i in nameMap));
+    if (need.length) {
+      const { data } = await sb.from('profiles').select('id, full_name').in('id', need);
+      (data || []).forEach((p) => { nameMap[p.id] = p.full_name; });
+    }
+  }
+  const nm = (id) => App.esc(nameMap[id] || '—');
+
+  const distName = {};
+  const { data: dl } = await sb.from('districts').select('id, name_bn');
+  (dl || []).forEach((d) => { distName[d.id] = d.name_bn; });
+
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-go]');
+    if (g) { e.preventDefault(); location.hash = '#' + g.dataset.go; return; }
+    const f = e.target.closest('[data-fset]');
+    if (f) { F[f.dataset.fset] = f.dataset.val; route(); }
+  });
+
+  async function badges() {
+    const c = (t, fn) => fn(sb.from(t).select('id', { count: 'exact', head: true })).then((r) => r.count || 0);
+    const jobs = [['inbox', () => c('support_threads', (q) => q.eq('status', 'open'))]];
+    if (can('verify_tutor')) jobs.push(['verify', () => c('verifications', (q) => q.eq('status', 'pending'))]);
+    if (can('approve_post')) jobs.push(['posts', () => c('tuition_posts', (q) => q.eq('status', 'pending'))]);
+    if (can('handle_reports')) jobs.push(['reports', () => c('reports', (q) => q.eq('status', 'open'))]);
+    jobs.forEach(([k, fn]) => fn().then((n) => {
+      const el = $('bd-' + k);
+      if (el) el.innerHTML = n ? '<span class="dot">' + App.bn(n) + '</span>' : '';
+    }));
+  }
+
+  // ============================================================
+  // ইনবক্স
+  // ============================================================
+  async function inboxTab() {
+    loading();
+    let q = sb.from('support_threads').select('id, user_id, subject, status, assigned_to, updated_at').order('updated_at', { ascending: false }).limit(60);
+    q = F.inbox === 'mine' ? q.eq('assigned_to', user.id) : q.eq('status', F.inbox);
+    const { data, error } = await q;
+    if (error) return fail(error);
+    await names((data || []).flatMap((t) => [t.user_id, t.assigned_to]));
+    panel.innerHTML = chipbar('inbox', [['open', 'নতুন'], ['pending', 'উত্তর দেওয়া'], ['resolved', 'সমাধান'], ['mine', 'আমার']]) +
+      '<div class="stack">' + (data.length ? data.map((t) =>
+        '<a class="card card-lift list-item" href="#" data-go="inbox/' + t.id + '"><div><b>' + App.esc(t.subject) + '</b>' +
+        '<div class="muted" style="font-size:.85rem">' + nm(t.user_id) + ' · ' + fmt(t.updated_at) + (t.assigned_to ? ' · দায়িত্বে: ' + nm(t.assigned_to) : '') + '</div></div>' +
+        '<span class="badge badge-gold">' + TS[t.status] + '</span></a>').join('') : '<div class="empty">কিছু নেই।</div>') + '</div>';
+  }
+
+  async function threadTab(id) {
+    loading();
+    const { data: t, error } = await sb.from('support_threads').select('*').eq('id', id).maybeSingle();
+    if (error) return fail(error);
+    if (!t) { panel.innerHTML = '<div class="empty">আলোচনাটি পাওয়া যায়নি।</div>'; return; }
+    await names([t.user_id, t.assigned_to]);
+
+    panel.innerHTML = back('inbox', 'ইনবক্স') +
+      '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">' +
+      '<div><h3 style="margin:0">' + App.esc(t.subject) + '</h3><div class="muted" style="font-size:.9rem">ইউজার: <a href="#" data-go="users/' + t.user_id + '"><b>' + nm(t.user_id) +
+      '</b></a> · দায়িত্বে: <span id="asg">' + (t.assigned_to ? nm(t.assigned_to) : 'কেউ নয়') + '</span> · <span id="st">' + TS[t.status] + '</span></div></div>' +
+      '<div class="action-row"><button class="btn btn-ghost btn-sm" id="take" type="button">আমি নিচ্ছি</button>' +
+      '<button class="btn btn-ghost btn-sm" id="resolve" type="button">সমাধান করুন</button></div></div>' +
+      '<div class="chat" id="chat" style="margin-top:14px"></div>' +
+      '<form class="composer" id="composer"><textarea class="input" id="c-body" rows="1" maxlength="1000" placeholder="উত্তর লিখুন..."></textarea><button class="btn btn-primary" type="submit">পাঠান</button></form></div>' +
+      '<div class="card stack" style="margin-top:16px"><h3 style="margin:0">ইন্টার্নাল নোট <span class="muted" style="font-size:.8rem;font-weight:400">(ইউজার দেখবে না)</span></h3>' +
+      '<div id="notes"></div><form class="composer" id="note-form"><textarea class="input" id="note-body" rows="1" maxlength="500" placeholder="নোট লিখুন..."></textarea><button class="btn btn-ghost" type="submit">যোগ</button></form></div>';
+
+    let lastCount = -1;
+    async function loadMsgs() {
+      const r = await sb.from('support_messages').select('id, body, from_staff, sender_id, created_at').eq('thread_id', id).order('created_at');
+      if (r.error || r.data.length === lastCount) return;
+      lastCount = r.data.length;
+      await names(r.data.map((m) => m.sender_id));
+      const chat = $('chat');
+      if (!chat) return;
+      chat.innerHTML = r.data.map((m) => '<div class="bubble ' + (m.from_staff ? 'me' : 'them') + '">' +
+        '<b style="font-size:.78rem">' + nm(m.sender_id) + '</b><br>' + App.esc(m.body) + '<small>' + fmt(m.created_at) + '</small></div>').join('');
+      chat.scrollTop = chat.scrollHeight;
+    }
+    async function loadNotes() {
+      const r = await sb.from('internal_notes').select('id, note, author_id, created_at').eq('target_type', 'user').eq('target_id', t.user_id).order('created_at', { ascending: false });
+      await names((r.data || []).map((n) => n.author_id));
+      $('notes').innerHTML = (r.data || []).length ? r.data.map((n) =>
+        '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div>' + App.esc(n.note) + '</div><div class="muted" style="font-size:.78rem">' + nm(n.author_id) + ' · ' + fmt(n.created_at) + '</div></div>').join('')
+        : '<div class="muted" style="font-size:.9rem">কোনো নোট নেই।</div>';
+    }
+    await Promise.all([loadMsgs(), loadNotes()]);
+    poll = setInterval(loadMsgs, 8000);
+
+    $('composer').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = $('c-body').value.trim();
+      if (!body) return;
+      $('c-body').value = '';
+      const m = await sb.from('support_messages').insert({ thread_id: id, body });
+      if (m.error) { $('c-body').value = body; return App.toast(App.errMsg(m.error)); }
+      if (!t.assigned_to) await sb.from('support_threads').update({ assigned_to: user.id }).eq('id', id);
+      lastCount = -1; loadMsgs(); $('st').textContent = TS.pending;
+    });
+    $('note-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const note = $('note-body').value.trim();
+      if (!note) return;
+      const r = await sb.from('internal_notes').insert({ target_type: 'user', target_id: t.user_id, note, author_id: user.id });
+      if (r.error) return App.toast(App.errMsg(r.error));
+      $('note-body').value = ''; loadNotes();
+    });
+    $('take').addEventListener('click', async () => {
+      const r = await sb.from('support_threads').update({ assigned_to: user.id }).eq('id', id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      $('asg').textContent = 'আমি'; App.toast('আপনি দায়িত্ব নিয়েছেন');
+    });
+    $('resolve').addEventListener('click', async () => {
+      const r = await sb.from('support_threads').update({ status: 'resolved' }).eq('id', id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      $('st').textContent = TS.resolved; App.toast('সমাধান হিসেবে চিহ্নিত'); badges();
+    });
+  }
+
+  // ============================================================
+  // ভেরিফিকেশন
+  // ============================================================
+  async function verifyList() {
+    loading();
+    const { data, error } = await sb.from('verifications').select('id, user_id, doc_type, status, created_at').eq('status', F.verify).order('created_at', { ascending: F.verify === 'pending' }).limit(60);
+    if (error) return fail(error);
+    await names((data || []).map((v) => v.user_id));
+    const DT = { nid: 'NID', student_id: 'স্টুডেন্ট আইডি', certificate: 'সার্টিফিকেট' };
+    panel.innerHTML = chipbar('verify', [['pending', 'অপেক্ষমাণ'], ['verified', 'Verified'], ['rejected', 'প্রত্যাখ্যাত']]) +
+      '<div class="stack">' + (data.length ? data.map((v) =>
+        '<a class="card card-lift list-item" href="#" data-go="verify/' + v.id + '"><div><b>' + nm(v.user_id) + '</b><div class="muted" style="font-size:.85rem">' +
+        (DT[v.doc_type] || App.esc(v.doc_type)) + ' · ' + fmt(v.created_at) + '</div></div><span class="badge badge-gold">দেখুন</span></a>').join('') : '<div class="empty">কিছু নেই।</div>') + '</div>';
+  }
+
+  async function verifyOne(id) {
+    loading();
+    const { data: v, error } = await sb.from('verifications').select('*').eq('id', id).maybeSingle();
+    if (error) return fail(error);
+    if (!v) { panel.innerHTML = '<div class="empty">পাওয়া যায়নি।</div>'; return; }
+    const [tp, sg] = await Promise.all([
+      sb.from('tutor_profiles').select('institution, department, education_level, verify_status').eq('user_id', v.user_id).maybeSingle(),
+      sb.storage.from('verification-docs').createSignedUrl(v.doc_path, 300)
+    ]);
+    await names([v.user_id]);
+    const t = tp.data;
+    const url = sg.data && sg.data.signedUrl;
+    const doc = !url ? '<div class="alert alert-error">ডকুমেন্ট খোলা যায়নি।</div>'
+      : /\.pdf$/i.test(v.doc_path) ? '<a class="btn btn-ghost" target="_blank" rel="noopener" href="' + App.esc(url) + '">PDF খুলুন</a>'
+      : '<img class="doc-img" alt="ডকুমেন্ট" src="' + App.esc(url) + '">';
+
+    panel.innerHTML = back('verify', 'ভেরিফিকেশন') +
+      '<div class="card stack"><h3 style="margin:0">' + nm(v.user_id) + '</h3>' +
+      (t ? '<div class="muted">' + App.esc([t.institution, t.department, t.education_level].filter(Boolean).join(' · ')) + '</div>' : '') +
+      '<div class="action-row"><a class="btn btn-ghost btn-sm" href="tutor.html?id=' + encodeURIComponent(v.user_id) + '" target="_blank">পাবলিক প্রোফাইল</a>' +
+      '<a class="btn btn-ghost btn-sm" href="#" data-go="users/' + v.user_id + '">ইউজার</a></div>' + doc + '</div>' +
+      '<div class="card stack" style="margin-top:16px"><div class="field" style="margin:0"><label for="v-note">মন্তব্য (প্রত্যাখ্যানে বাধ্যতামূলক, ইউজারকে দেখানো হবে)</label>' +
+      '<textarea class="input" id="v-note" rows="2" maxlength="300"></textarea></div>' +
+      (v.status === 'pending' ? '<div class="action-row"><button class="btn btn-primary" id="ok" type="button">✔ Verified করুন</button><button class="btn btn-ghost" id="no" type="button">প্রত্যাখ্যান</button></div>'
+        : '<div class="alert alert-info" style="margin:0">স্ট্যাটাস: ' + App.esc(v.status) + (v.review_note ? ' — ' + App.esc(v.review_note) : '') + '</div>') +
+      '<hr style="border:0;border-top:1px solid var(--line);width:100%"><div class="muted" style="font-size:.9rem">ফোনে কল করে নিশ্চিত হলে:</div>' +
+      '<div class="action-row">' + (can('view_contact') ? '<button class="btn btn-ghost btn-sm" id="show-phone" type="button">ফোন নম্বর দেখুন</button>' : '') +
+      '<button class="btn btn-gold btn-sm" id="phone-ok" type="button">ফোন যাচাই হয়েছে ✔</button></div><div id="phone-out"></div></div>';
+
+    const decide = async (status) => {
+      const note = $('v-note').value.trim();
+      if (status === 'rejected' && !note) return App.toast('প্রত্যাখ্যানের কারণ লিখুন');
+      const r = await sb.from('verifications').update({ status, review_note: note || null }).eq('id', id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      App.toast(status === 'verified' ? 'Verified করা হয়েছে ✔' : 'প্রত্যাখ্যান করা হয়েছে');
+      location.hash = '#verify';
+    };
+    if ($('ok')) { $('ok').addEventListener('click', () => decide('verified')); $('no').addEventListener('click', () => decide('rejected')); }
+    if ($('show-phone')) $('show-phone').addEventListener('click', async () => {
+      const r = await sb.rpc('reveal_contact', { target: v.user_id });
+      $('phone-out').innerHTML = r.error ? '<div class="alert alert-error">' + App.esc(App.errMsg(r.error)) + '</div>' : '<b>' + App.esc(r.data || 'নম্বর নেই') + '</b>';
+    });
+    $('phone-ok').addEventListener('click', async () => {
+      const r = await sb.rpc('admin_set_phone_verified', { target: v.user_id, val: true });
+      App.toast(r.error ? App.errMsg(r.error) : 'ফোন যাচাই চিহ্নিত হয়েছে ✔');
+    });
+  }
+
+  // ============================================================
+  // পোস্ট অনুমোদন
+  // ============================================================
+  async function postsTab() {
+    loading();
+    const { data, error } = await sb.from('tuition_posts').select('*').eq('status', F.posts).order('created_at', { ascending: false }).limit(40);
+    if (error) return fail(error);
+    await names((data || []).map((p) => p.owner_id));
+    panel.innerHTML = chipbar('posts', [['pending', 'অপেক্ষমাণ'], ['published', 'প্রকাশিত'], ['rejected', 'প্রত্যাখ্যাত'], ['filled', 'পূর্ণ']]) +
+      '<div class="stack">' + (data.length ? data.map((p) =>
+        '<div class="card stack"><div style="display:flex;justify-content:space-between;gap:10px"><b>' + App.esc(p.public_id) + ' · ক্লাস ' + App.bn(p.class_level) + '</b><span class="muted" style="font-size:.85rem">' + fmt(p.created_at) + '</span></div>' +
+        '<div class="tag-row">' + (p.subjects || []).map((s) => '<span class="chip">' + App.esc(s) + '</span>').join('') + '</div>' +
+        '<div class="meta-row"><span>📍 ' + App.esc([p.area_text, distName[p.district_id]].filter(Boolean).join(', ')) + '</span><span>🏠 ' + App.MODE[p.mode] + '</span>' +
+        '<span>💰 <b>৳' + App.bn(p.salary) + '</b></span><span>📅 সপ্তাহে ' + App.bn(p.days_per_week) + ' দিন</span><span>👤 ' + nm(p.owner_id) + '</span></div>' +
+        (p.requirements ? '<div style="font-size:.92rem">' + App.esc(p.requirements) + '</div>' : '') +
+        (p.status === 'rejected' && p.reject_reason ? '<div class="alert alert-error" style="margin:0">কারণ: ' + App.esc(p.reject_reason) + '</div>' : '') +
+        (p.status === 'pending' ? '<div class="action-row"><button class="btn btn-primary btn-sm" data-act="ok" data-id="' + p.id + '" type="button">অনুমোদন</button>' +
+          '<button class="btn btn-ghost btn-sm" data-act="no" data-id="' + p.id + '" type="button">প্রত্যাখ্যান</button>' +
+          '<a class="btn btn-ghost btn-sm" href="#" data-go="users/' + p.owner_id + '">ইউজার</a></div>' : '') + '</div>').join('') : '<div class="empty">কিছু নেই।</div>') + '</div>';
+
+    panel.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
+      const upd = { assigned_to: user.id };
+      if (b.dataset.act === 'ok') upd.status = 'published';
+      else {
+        const why = (prompt('প্রত্যাখ্যানের কারণ লিখুন (ইউজারকে দেখানো হবে):') || '').trim();
+        if (!why) return;
+        upd.status = 'rejected'; upd.reject_reason = why.slice(0, 200);
+      }
+      const r = await sb.from('tuition_posts').update(upd).eq('id', b.dataset.id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      App.toast('সম্পন্ন'); postsTab(); badges();
+    }));
+  }
+
+  // ============================================================
+  // রিপোর্ট
+  // ============================================================
+  async function reportsTab() {
+    loading();
+    const { data, error } = await sb.from('reports').select('*').eq('status', F.reports).order('created_at', { ascending: false }).limit(40);
+    if (error) return fail(error);
+    await names((data || []).map((r) => r.reporter_id));
+    const TT = { tutor: 'টিউটর', post: 'পোস্ট', user: 'ইউজার' };
+    panel.innerHTML = chipbar('reports', [['open', 'নতুন'], ['reviewing', 'দেখা হচ্ছে'], ['resolved', 'সমাধান'], ['dismissed', 'খারিজ']]) +
+      '<div class="stack">' + (data.length ? data.map((r) =>
+        '<div class="card stack"><div style="display:flex;justify-content:space-between;gap:10px"><b>' + TT[r.target_type] + ' সম্পর্কে</b><span class="muted" style="font-size:.85rem">' + fmt(r.created_at) + '</span></div>' +
+        '<div>' + App.esc(r.reason) + (r.details ? '<div class="muted">' + App.esc(r.details) + '</div>' : '') + '</div>' +
+        '<div class="muted" style="font-size:.88rem">রিপোর্টকারী: ' + nm(r.reporter_id) + '</div>' +
+        (r.resolution_note ? '<div class="alert alert-info" style="margin:0">' + App.esc(r.resolution_note) + '</div>' : '') +
+        '<div class="action-row">' + (r.target_type !== 'post' ? '<a class="btn btn-ghost btn-sm" href="#" data-go="users/' + r.target_id + '">ইউজার দেখুন</a>' : '') +
+        (['open', 'reviewing'].includes(r.status) ? '<button class="btn btn-ghost btn-sm" data-act="take" data-id="' + r.id + '" type="button">আমি দেখছি</button>' +
+          '<button class="btn btn-primary btn-sm" data-act="resolved" data-id="' + r.id + '" type="button">সমাধান</button>' +
+          '<button class="btn btn-ghost btn-sm" data-act="dismissed" data-id="' + r.id + '" type="button">খারিজ</button>' : '') + '</div></div>').join('') : '<div class="empty">কিছু নেই।</div>') + '</div>';
+
+    panel.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
+      const a = b.dataset.act;
+      const upd = a === 'take' ? { status: 'reviewing', assigned_to: user.id } : { status: a, assigned_to: user.id };
+      if (a !== 'take') {
+        const note = (prompt('মন্তব্য লিখুন:') || '').trim();
+        if (!note) return;
+        upd.resolution_note = note.slice(0, 300);
+      }
+      const r = await sb.from('reports').update(upd).eq('id', b.dataset.id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      App.toast('সম্পন্ন'); reportsTab(); badges();
+    }));
+  }
+
+  // ============================================================
+  // ইউজার
+  // ============================================================
+  function usersHome() {
+    panel.innerHTML = '<form class="card stack" id="u-form"><div class="field" style="margin:0"><label for="u-q">ইউজার খুঁজুন</label>' +
+      '<input class="input" id="u-q" placeholder="নাম' + (can('view_contact') ? ', মোবাইল নম্বর বা ইমেইল' : '') + '"></div>' +
+      '<button class="btn btn-primary" type="submit">খুঁজুন</button></form><div id="u-res" class="stack" style="margin-top:16px"></div>';
+    $('u-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const q = $('u-q').value.trim();
+      if (q.length < 2) return;
+      $('u-res').innerHTML = '<div class="skeleton" style="height:70px"></div>';
+      const r = await sb.rpc('admin_find_user', { q });
+      if (r.error) { $('u-res').innerHTML = ''; return App.showAlert(msg, 'error', App.errMsg(r.error)); }
+      $('u-res').innerHTML = r.data.length ? r.data.map((u) =>
+        '<a class="card card-lift list-item" href="#" data-go="users/' + u.id + '"><div><b>' + App.esc(u.full_name) + '</b><div class="muted" style="font-size:.85rem">' +
+        (u.email ? App.esc(u.email) + ' · ' : '') + fmt(u.created_at) + '</div></div><span>' +
+        (u.is_tutor ? '<span class="badge badge-gold">টিউটর</span> ' : '') + (u.is_blocked ? '<span class="badge" style="background:var(--danger-soft);color:var(--danger)">ব্লকড</span>' : '') + '</span></a>').join('')
+        : '<div class="empty">কাউকে পাওয়া যায়নি।</div>';
+    });
+  }
+
+  async function userOne(id) {
+    loading();
+    const [p, tp, th, nt] = await Promise.all([
+      sb.from('profiles').select('id, full_name, gender, district_id, is_blocked, created_at').eq('id', id).maybeSingle(),
+      sb.from('tutor_profiles').select('verify_status').eq('user_id', id).maybeSingle(),
+      sb.from('support_threads').select('id, subject, status, updated_at').eq('user_id', id).order('updated_at', { ascending: false }).limit(10),
+      sb.from('internal_notes').select('id, note, author_id, created_at').eq('target_type', 'user').eq('target_id', id).order('created_at', { ascending: false })
+    ]);
+    if (p.error) return fail(p.error);
+    const u = p.data;
+    if (!u) { panel.innerHTML = '<div class="empty">ইউজার পাওয়া যায়নি।</div>'; return; }
+    await names((nt.data || []).map((n) => n.author_id));
+    const VS = { none: 'যাচাই হয়নি', pending: 'যাচাই চলছে', verified: 'Verified', rejected: 'প্রত্যাখ্যাত' };
+
+    panel.innerHTML = back('users', 'ইউজার খোঁজা') +
+      '<div class="card stack"><h2 style="margin:0">' + App.esc(u.full_name) + (u.is_blocked ? ' <span class="badge" style="background:var(--danger-soft);color:var(--danger)">ব্লকড</span>' : '') + '</h2>' +
+      '<div class="muted">' + (u.gender === 'male' ? 'পুরুষ' : u.gender === 'female' ? 'নারী' : '—') + ' · ' + App.esc(distName[u.district_id] || '—') + ' · যোগ দিয়েছেন ' + fmt(u.created_at) + '</div>' +
+      (tp.data ? '<div>টিউটর প্রোফাইল: <span class="badge badge-gold">' + VS[tp.data.verify_status] + '</span> <a href="tutor.html?id=' + encodeURIComponent(id) + '" target="_blank">পাবলিক ভিউ</a></div>' : '') +
+      '<div class="action-row">' + (can('view_contact') ? '<button class="btn btn-ghost btn-sm" id="show-phone" type="button">ফোন নম্বর দেখুন</button>' : '') +
+      '<button class="btn btn-primary btn-sm" id="msg-btn" type="button">বার্তা পাঠান</button>' +
+      (can('block_user') && id !== user.id ? '<button class="btn btn-ghost btn-sm" id="block" type="button">' + (u.is_blocked ? 'আনব্লক করুন' : 'ব্লক করুন') + '</button>' : '') + '</div>' +
+      '<div id="phone-out"></div></div>' +
+      '<form class="card stack" id="m-form" hidden style="margin-top:16px"><div class="field" style="margin:0"><label for="m-sub">বিষয়</label><input class="input" id="m-sub" maxlength="100"></div>' +
+      '<div class="field" style="margin:0"><label for="m-body">বার্তা</label><textarea class="input" id="m-body" rows="3" maxlength="1000"></textarea></div>' +
+      '<button class="btn btn-primary" type="submit">পাঠান</button></form>' +
+      '<div class="card stack" style="margin-top:16px"><h3 style="margin:0">আলোচনা</h3>' + ((th.data || []).length ? th.data.map((t) =>
+        '<a href="#" data-go="inbox/' + t.id + '" class="list-item" style="padding:6px 0"><span>' + App.esc(t.subject) + '</span><span class="badge badge-gold">' + TS[t.status] + '</span></a>').join('') : '<div class="muted">কিছু নেই।</div>') + '</div>' +
+      '<div class="card stack" style="margin-top:16px"><h3 style="margin:0">ইন্টার্নাল নোট</h3>' + ((nt.data || []).length ? nt.data.map((n) =>
+        '<div style="padding:6px 0;border-bottom:1px solid var(--line)">' + App.esc(n.note) + '<div class="muted" style="font-size:.78rem">' + nm(n.author_id) + ' · ' + fmt(n.created_at) + '</div></div>').join('') : '<div class="muted">কোনো নোট নেই।</div>') + '</div>';
+
+    if ($('show-phone')) $('show-phone').addEventListener('click', async () => {
+      const r = await sb.rpc('reveal_contact', { target: id });
+      $('phone-out').innerHTML = r.error ? '<div class="alert alert-error">' + App.esc(App.errMsg(r.error)) + '</div>' : '<b>' + App.esc(r.data || 'নম্বর নেই') + '</b> <span class="muted" style="font-size:.8rem">(এই দেখাটি লগ হয়েছে)</span>';
+    });
+    $('msg-btn').addEventListener('click', () => { $('m-form').hidden = !$('m-form').hidden; });
+    $('m-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const sub = $('m-sub').value.trim(), body = $('m-body').value.trim();
+      if (!sub || !body) return App.toast('বিষয় ও বার্তা লিখুন');
+      const th2 = await sb.from('support_threads').insert({ user_id: id, subject: sub, assigned_to: user.id }).select('id').single();
+      if (th2.error) return App.toast(App.errMsg(th2.error));
+      const m = await sb.from('support_messages').insert({ thread_id: th2.data.id, body });
+      if (m.error) return App.toast(App.errMsg(m.error));
+      App.toast('বার্তা পাঠানো হয়েছে'); location.hash = '#inbox/' + th2.data.id;
+    });
+    if ($('block')) $('block').addEventListener('click', async () => {
+      if (!confirm(u.is_blocked ? 'আনব্লক করবেন?' : 'এই ইউজারকে ব্লক করবেন?')) return;
+      const r = await sb.from('profiles').update({ is_blocked: !u.is_blocked }).eq('id', id);
+      if (r.error) return App.toast(App.errMsg(r.error));
+      userOne(id);
+    });
+  }
+
+  // ============================================================
+  // স্টাফ (শুধু Super Admin)
+  // ============================================================
+  const permBoxes = (sel, prefix) => '<div class="perm-grid">' + PERMS.map((p) =>
+    '<label class="check"><input type="checkbox" data-perm="' + p[0] + '" data-scope="' + prefix + '"' + (sel.includes(p[0]) ? ' checked' : '') + '> <span>' + p[1] + '</span></label>').join('') + '</div>';
+  const readPerms = (root) => [...root.querySelectorAll('[data-perm]')].filter((c) => c.checked).map((c) => c.dataset.perm);
+
+  async function staffTab() {
+    loading();
+    const { data, error } = await sb.from('staff_roles').select('*').order('created_at');
+    if (error) return fail(error);
+    await names((data || []).map((s) => s.user_id));
+
+    panel.innerHTML = '<form class="card stack" id="add-form"><h3 style="margin:0">নতুন মডারেটর যোগ করুন</h3>' +
+      '<div class="muted" style="font-size:.9rem">আগে তাকে সাইটে রেজিস্টার করতে বলুন, তারপর তার ইমেইল দিয়ে খুঁজুন।</div>' +
+      '<div style="display:flex;gap:8px"><input class="input" id="s-email" type="email" placeholder="moderator@example.com"><button class="btn btn-ghost" type="submit">খুঁজুন</button></div><div id="s-found"></div></form>' +
+      '<h3 style="margin:24px 0 12px">বর্তমান স্টাফ</h3><div class="stack">' + (data || []).map((s) =>
+        '<details class="card" data-uid="' + s.user_id + '"><summary>' + nm(s.user_id) + ' · ' + (s.role === 'super_admin' ? 'Super Admin' : 'মডারেটর') +
+        (s.is_active ? '' : ' <span class="badge" style="background:var(--danger-soft);color:var(--danger)">নিষ্ক্রিয়</span>') + '</summary>' +
+        (s.role === 'super_admin' ? '<p class="muted" style="margin:10px 0 0">Super Admin-এর সব অনুমতি আছে।</p>' :
+          permBoxes(s.permissions || [], 'edit') + '<label class="check" style="margin-bottom:10px"><input type="checkbox" data-active' + (s.is_active ? ' checked' : '') + '> <span>সক্রিয়</span></label>' +
+          '<button class="btn btn-primary btn-sm" data-save type="button">সংরক্ষণ</button>') + '</details>').join('') + '</div>';
+
+    panel.querySelectorAll('details[data-uid] [data-save]').forEach((b) => b.addEventListener('click', async () => {
+      const box = b.closest('details');
+      const r = await sb.from('staff_roles').update({ permissions: readPerms(box), is_active: box.querySelector('[data-active]').checked }).eq('user_id', box.dataset.uid);
+      App.toast(r.error ? App.errMsg(r.error) : 'সংরক্ষিত ✔');
+    }));
+
+    $('add-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = $('s-email').value.trim();
+      if (!email) return;
+      const r = await sb.rpc('admin_find_user', { q: email });
+      if (r.error) return App.showAlert(msg, 'error', App.errMsg(r.error));
+      if (!r.data.length) { $('s-found').innerHTML = '<div class="alert alert-error">এই ইমেইলে কেউ রেজিস্টার করেনি।</div>'; return; }
+      const u = r.data[0];
+      $('s-found').innerHTML = '<div class="card" style="background:var(--primary-50)"><b>' + App.esc(u.full_name) + '</b>' + permBoxes([], 'new') +
+        '<button class="btn btn-primary btn-sm" id="s-add" type="button">মডারেটর বানান</button></div>';
+      $('s-add').addEventListener('click', async () => {
+        const ins = await sb.from('staff_roles').insert({ user_id: u.id, role: 'moderator', permissions: readPerms($('s-found')), created_by: user.id });
+        if (ins.error) return App.toast(ins.error.code === '23505' ? 'ইনি ইতিমধ্যে স্টাফ' : App.errMsg(ins.error));
+        App.toast('মডারেটর যোগ হয়েছে ✔'); staffTab();
+      });
+    });
+  }
+
+  // ============================================================
+  // অডিট লগ
+  // ============================================================
+  async function auditTab() {
+    loading();
+    const { data, error } = await sb.from('audit_logs').select('id, actor_id, action, table_name, record_id, new_data, created_at').order('id', { ascending: false }).limit(100);
+    if (error) return fail(error);
+    await names((data || []).map((a) => a.actor_id));
+    panel.innerHTML = '<h3>সাম্প্রতিক ১০০টি কাজ</h3><div class="stack">' + (data.length ? data.map((a) =>
+      '<details class="card" style="padding:12px 16px"><summary>' + nm(a.actor_id) + ' · <b>' + App.esc(a.action) + '</b> · ' + App.esc(a.table_name || '') +
+      '<div class="muted" style="font-size:.8rem;font-weight:400">' + fmt(a.created_at) + '</div></summary>' +
+      '<div class="muted" style="font-size:.8rem;margin-top:6px">রেকর্ড: ' + App.esc(a.record_id || '—') + '</div>' +
+      (a.new_data ? '<pre class="json">' + App.esc(JSON.stringify(a.new_data).slice(0, 700)) + '</pre>' : '') + '</details>').join('') : '<div class="empty">কিছু নেই।</div>') + '</div>';
+  }
+
+  // ---------- রাউটার ----------
+  function route() {
+    clearInterval(poll);
+    msg.hidden = true;
+    const parts = (location.hash || '#inbox').slice(1).split('/');
+    let tab = parts[0], arg = parts[1];
+    if (!TABS.some((t) => t[0] === tab)) { tab = 'inbox'; arg = undefined; }
+    document.querySelectorAll('.tab').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
+    badges();
+    const H = {
+      inbox: () => (arg ? threadTab(arg) : inboxTab()),
+      verify: () => (arg ? verifyOne(arg) : verifyList()),
+      posts: postsTab, reports: reportsTab,
+      users: () => (arg ? userOne(arg) : usersHome()),
+      staff: staffTab, audit: auditTab
+    };
+    H[tab]();
+  }
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+</body>
+</html>
